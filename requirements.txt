@@ -1,8 +1,5 @@
 streamlit
-numpy
 librosa
-scikit-learn
-scipy
-sounddevice
+numpy
 pydub
-ffmpeg-python
+soundfile
