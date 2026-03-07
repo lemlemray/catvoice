@@ -4,3 +4,5 @@ librosa
 scikit-learn
 scipy
 sounddevice
+pydub
+ffmpeg-python
