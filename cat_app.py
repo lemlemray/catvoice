@@ -1,7 +1,11 @@
+import streamlit as st
+import numpy as np
+import librosa
+from pydub import AudioSegment
+import tempfile
 from pydub import AudioSegment
 import librosa
 import tempfile
-
 uploaded_file = st.file_uploader("猫の声をアップロード", type=["wav","mp3","m4a","mp4","mov"])
 
 if uploaded_file:
