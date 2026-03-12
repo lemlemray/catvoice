@@ -1,10 +1,5 @@
 streamlit
+librosa
 numpy
-librosa==0.10.1
-matplotlib==3.8.4
 soundfile
-moviepy
-imageio
-imageio-ffmpeg
 scipy
-numba
