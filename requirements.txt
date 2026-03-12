@@ -5,3 +5,4 @@ scipy
 soundfile
 matplotlib
 numba
+moviepy
