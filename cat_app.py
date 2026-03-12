@@ -3,14 +3,35 @@ import librosa
 import numpy as np
 import tempfile
 
+# ページ設定（スマホ対応）
+st.set_page_config(
+    page_title="猫翻訳AI",
+    page_icon="🐈",
+    layout="centered"
+)
+
+# スマホ用余白調整
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 500px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 st.title("🐈 猫翻訳AI")
 
-st.write("猫の声をアップロードしてください")
+st.write("猫の鳴き声をアップロードすると感情を解析します。")
+
 
 uploaded_file = st.file_uploader(
-    "音声ファイル",
-    type=["wav","mp3","m4a"]
+    "📱 猫の声をアップロード",
+    type=["wav", "mp3", "m4a"]
 )
+
 
 def analyze_cat_voice(audio_path):
 
@@ -19,26 +40,42 @@ def analyze_cat_voice(audio_path):
     pitch = np.mean(librosa.yin(y, fmin=50, fmax=500))
     energy = np.mean(librosa.feature.rms(y=y))
 
-    if pitch > 300:
+    if pitch > 320:
         emotion = "甘えている"
-    elif energy > 0.1:
-        emotion = "何か要求している"
+        message = "ねえ、こっち来てよ"
+    elif energy > 0.12:
+        emotion = "要求している"
+        message = "ごはんまだ？"
     else:
-        emotion = "リラックスしている"
+        emotion = "落ち着いている"
+        message = "今日はのんびりしてる"
 
-    return emotion, pitch, energy
+    return emotion, message, pitch, energy
 
 
 if uploaded_file is not None:
+
+    st.audio(uploaded_file)
 
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp.write(uploaded_file.read())
         path = tmp.name
 
-    emotion, pitch, energy = analyze_cat_voice(path)
+    st.info("🧠 猫語を解析中...")
+
+    emotion, message, pitch, energy = analyze_cat_voice(path)
 
     st.success("解析結果")
 
-    st.write("感情:", emotion)
-    st.write("声の高さ:", float(pitch))
-    st.write("声の強さ:", float(energy))
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric("🐾 感情", emotion)
+
+    with col2:
+        st.metric("💬 猫語翻訳", message)
+
+    st.divider()
+
+    st.metric("🎵 声の高さ", round(float(pitch),2))
+    st.metric("🔊 声の強さ", round(float(energy),3))
