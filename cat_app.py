@@ -1,77 +1,53 @@
 import streamlit as st
 import librosa
 import numpy as np
-import tempfile
-from pydub import AudioSegment
-import os
-import time
+from sklearn.ensemble import RandomForestClassifier
 
-st.title("🐱 猫翻訳AI")
+st.title("🐈 猫翻訳AI")
 
-st.write("猫の声をアップロードしてください")
-st.write("※動画は解析に最大30秒ほどかかります")
+st.write("猫の鳴き声をアップロードしてください")
 
 uploaded_file = st.file_uploader(
-    "音声または動画",
-    type=["wav","mp3","m4a","mp4","mov"]
+    "猫の鳴き声ファイル",
+    type=["wav","mp3","m4a"]
 )
 
-def analyze_meow(y, sr):
+if uploaded_file is not None:
 
-    pitch = np.mean(librosa.yin(y, fmin=50, fmax=500))
-    energy = np.mean(librosa.feature.rms(y=y))
+    y, sr = librosa.load(uploaded_file)
 
-    if pitch > 350:
-        return "🐱 甘えている"
-    elif energy > 0.1:
-        return "🐱 ごはん要求"
-    else:
-        return "🐱 警戒"
+    mfcc = librosa.feature.mfcc(y=y, sr=sr)
+    feature = np.mean(mfcc.T, axis=0)
 
-if uploaded_file:
+    # 仮の学習データ（簡易AI）
+    X = [
+        feature,
+        feature * 0.9,
+        feature * 1.1,
+        feature * 0.8,
+        feature * 1.2
+    ]
 
-    st.audio(uploaded_file)
+    y_labels = [
+        "警戒",
+        "お腹すいた",
+        "甘え",
+        "不満",
+        "威嚇"
+    ]
 
-    progress = st.progress(0)
-    status = st.empty()
+    model = RandomForestClassifier()
+    model.fit(X, y_labels)
 
-    status.write("ファイルを処理しています…")
+    prediction = model.predict([feature])
 
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(uploaded_file.read())
-        temp_path = tmp.name
+    messages = {
+        "警戒":"🐈 何か警戒しています",
+        "お腹すいた":"🐈 お腹が減っている可能性",
+        "甘え":"🐈 甘えています",
+        "不満":"🐈 少し不満がありそう",
+        "威嚇":"🐈 威嚇しています"
+    }
 
-    try:
-
-        progress.progress(20)
-        status.write("音声を抽出しています…")
-
-        audio = AudioSegment.from_file(temp_path)
-        audio = audio[:10000]
-
-        wav_path = temp_path + ".wav"
-
-        progress.progress(40)
-        status.write("音声を変換しています…")
-
-        audio.export(wav_path, format="wav")
-
-        progress.progress(70)
-        status.write("猫語を解析しています…")
-
-        y, sr = librosa.load(wav_path, sr=None)
-
-        result = analyze_meow(y, sr)
-
-        progress.progress(100)
-        status.write("解析完了")
-
-        st.success("翻訳結果： " + result)
-
-    except Exception as e:
-        st.error("音声処理エラー")
-        st.text(e)
-
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+    st.subheader("猫の気持ち")
+    st.success(messages[prediction[0]])
