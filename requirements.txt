@@ -1,10 +1,4 @@
 streamlit
 librosa
 numpy
-scipy
 soundfile
-matplotlib
-numba
-moviepy
-imageio
-imageio-ffmpeg
