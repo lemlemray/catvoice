@@ -2,24 +2,44 @@ import streamlit as st
 import librosa
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from moviepy.editor import VideoFileClip
+import tempfile
+import os
 
 st.title("🐈 猫翻訳AI")
 
-st.write("猫の鳴き声をアップロードしてください")
-
 uploaded_file = st.file_uploader(
-    "猫の鳴き声ファイル",
-    type=["wav","mp3","m4a"]
+    "猫の鳴き声をアップロード",
+    type=["wav","mp3","m4a","mov","mp4"]
 )
 
 if uploaded_file is not None:
 
-    y, sr = librosa.load(uploaded_file)
+    suffix = uploaded_file.name.split(".")[-1].lower()
+
+    # 一時ファイル作成
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix="."+suffix)
+    temp_file.write(uploaded_file.read())
+    temp_file.close()
+
+    audio_path = temp_file.name
+
+    # 動画なら音声を抽出
+    if suffix in ["mov","mp4"]:
+        video = VideoFileClip(audio_path)
+        audio_path = audio_path + ".wav"
+        video.audio.write_audiofile(audio_path)
+
+    try:
+        y, sr = librosa.load(audio_path)
+
+    except:
+        st.error("音声の読み込みに失敗しました")
+        st.stop()
 
     mfcc = librosa.feature.mfcc(y=y, sr=sr)
     feature = np.mean(mfcc.T, axis=0)
 
-    # 仮の学習データ（簡易AI）
     X = [
         feature,
         feature * 0.9,
