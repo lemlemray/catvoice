@@ -2,37 +2,45 @@ import streamlit as st
 import librosa
 import numpy as np
 import tempfile
+from pydub import AudioSegment
 
-# ページ設定（スマホ対応）
 st.set_page_config(
     page_title="猫翻訳AI",
     page_icon="🐈",
     layout="centered"
 )
 
-# スマホ用余白調整
+# スマホ用スタイル
 st.markdown("""
 <style>
 .block-container {
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
     max-width: 500px;
+    padding-top: 1.5rem;
 }
 </style>
 """, unsafe_allow_html=True)
 
-
 st.title("🐈 猫翻訳AI")
 
-st.write("猫の鳴き声をアップロードすると感情を解析します。")
-
+st.write("iPhoneボイスメモなどの猫の鳴き声をアップロードしてください")
 
 uploaded_file = st.file_uploader(
-    "📱 猫の声をアップロード",
+    "📱 音声アップロード",
     type=["wav", "mp3", "m4a"]
 )
 
 
+# 音声をWAVに変換
+def convert_to_wav(file_path):
+
+    audio = AudioSegment.from_file(file_path)
+    wav_path = file_path + ".wav"
+    audio.export(wav_path, format="wav")
+
+    return wav_path
+
+
+# 猫声解析
 def analyze_cat_voice(audio_path):
 
     y, sr = librosa.load(audio_path)
@@ -58,14 +66,19 @@ if uploaded_file is not None:
     st.audio(uploaded_file)
 
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
+
         tmp.write(uploaded_file.read())
-        path = tmp.name
+        temp_path = tmp.name
+
+
+    wav_path = convert_to_wav(temp_path)
 
     st.info("🧠 猫語を解析中...")
 
-    emotion, message, pitch, energy = analyze_cat_voice(path)
+    emotion, message, pitch, energy = analyze_cat_voice(wav_path)
 
     st.success("解析結果")
+
 
     col1, col2 = st.columns(2)
 
