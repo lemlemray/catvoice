@@ -1,7 +1,9 @@
 import streamlit as st
-import librosa
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+import soundfile as sf
 from moviepy.editor import VideoFileClip
 import tempfile
 import os
@@ -9,65 +11,85 @@ import os
 st.title("🐈 猫翻訳AI")
 
 uploaded_file = st.file_uploader(
-    "猫の鳴き声をアップロード",
-    type=["wav","mp3","m4a","mov","mp4"]
+    "猫の声をアップロード",
+    type=["wav","mp3","mp4","mov"]
 )
 
-if uploaded_file is not None:
+def extract_audio_from_video(video_file):
+    tmp_video = tempfile.NamedTemporaryFile(delete=False)
+    tmp_video.write(video_file.read())
 
-    suffix = uploaded_file.name.split(".")[-1].lower()
+    clip = VideoFileClip(tmp_video.name)
 
-    # 一時ファイル作成
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix="."+suffix)
-    temp_file.write(uploaded_file.read())
-    temp_file.close()
+    tmp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
 
-    audio_path = temp_file.name
+    clip.audio.write_audiofile(tmp_audio.name)
 
-    # 動画なら音声を抽出
-    if suffix in ["mov","mp4"]:
-        video = VideoFileClip(audio_path)
-        audio_path = audio_path + ".wav"
-        video.audio.write_audiofile(audio_path)
+    return tmp_audio.name
 
-    try:
-        y, sr = librosa.load(audio_path)
 
-    except:
-        st.error("音声の読み込みに失敗しました")
-        st.stop()
+def analyze_cat_voice(audio_path):
 
-    mfcc = librosa.feature.mfcc(y=y, sr=sr)
-    feature = np.mean(mfcc.T, axis=0)
+    y, sr = librosa.load(audio_path)
 
-    X = [
-        feature,
-        feature * 0.9,
-        feature * 1.1,
-        feature * 0.8,
-        feature * 1.2
-    ]
+    duration = librosa.get_duration(y=y, sr=sr)
 
-    y_labels = [
-        "警戒",
-        "お腹すいた",
-        "甘え",
-        "不満",
-        "威嚇"
-    ]
+    pitch = np.mean(librosa.yin(y, fmin=50, fmax=1000))
 
-    model = RandomForestClassifier()
-    model.fit(X, y_labels)
+    energy = np.mean(librosa.feature.rms(y=y))
 
-    prediction = model.predict([feature])
+    mfcc = np.mean(librosa.feature.mfcc(y=y, sr=sr))
 
-    messages = {
-        "警戒":"🐈 何か警戒しています",
-        "お腹すいた":"🐈 お腹が減っている可能性",
-        "甘え":"🐈 甘えています",
-        "不満":"🐈 少し不満がありそう",
-        "威嚇":"🐈 威嚇しています"
-    }
+    return duration, pitch, energy, mfcc, y, sr
 
-    st.subheader("猫の気持ち")
-    st.success(messages[prediction[0]])
+
+def cat_translate(pitch, energy):
+
+    if pitch > 500 and energy > 0.05:
+        return "ごはん！ごはん！"
+    elif pitch > 400:
+        return "かまってほしい"
+    elif energy < 0.02:
+        return "眠い…"
+    elif pitch < 250:
+        return "警戒している"
+    else:
+        return "なんとなく話してる"
+
+
+if uploaded_file:
+
+    st.audio(uploaded_file)
+
+    file_type = uploaded_file.name.split(".")[-1]
+
+    if file_type in ["mp4","mov"]:
+        audio_path = extract_audio_from_video(uploaded_file)
+    else:
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.write(uploaded_file.read())
+        audio_path = tmp.name
+
+    duration, pitch, energy, mfcc, y, sr = analyze_cat_voice(audio_path)
+
+    st.write("### 解析結果")
+
+    st.write("鳴き声の長さ:", duration)
+    st.write("平均ピッチ:", pitch)
+    st.write("音量:", energy)
+
+    translation = cat_translate(pitch, energy)
+
+    st.write("### 猫翻訳")
+
+    st.success(translation)
+
+    fig, ax = plt.subplots()
+
+    D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
+
+    img = librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='log', ax=ax)
+
+    plt.colorbar(img, ax=ax, format="%+2.f dB")
+
+    st.pyplot(fig)
