@@ -6,3 +6,5 @@ soundfile
 matplotlib
 numba
 moviepy
+imageio
+imageio-ffmpeg
