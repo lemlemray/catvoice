@@ -178,11 +178,7 @@ if audio_path is not None:
     if st.button("🗑️ 履歴をリセット"):
         st.session_state.history = []
         st.rerun()
-```
-
----
-
-## requirements.txt もこれに書き換えて！
+requirements.txt もこれに書き換えて！
 ```
 streamlit
 librosa
