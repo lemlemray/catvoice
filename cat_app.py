@@ -1,181 +1,223 @@
-import streamlit as st
-import librosa
-import numpy as np
-import tempfile
-import time
-from audiorecorder import audiorecorder
-import plotly.graph_objects as go
-
-# ページ設定（一番最初に書く！）
-st.set_page_config(
-    page_title="猫翻訳AI",
-    page_icon="🐈",
-    layout="centered"
-)
-
-# スマホ用スタイル
-st.markdown("""
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐈 猫翻訳AI リアルタイム</title>
 <style>
-.block-container {
-    max-width: 500px;
-    padding-top: 1.5rem;
-}
+  body { font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #1a1a2e; color: white; }
+  h1 { text-align: center; font-size: 2em; }
+  .btn { width: 100%; padding: 20px; font-size: 1.5em; border: none; border-radius: 15px; cursor: pointer; margin: 10px 0; }
+  .start { background: #e94560; color: white; }
+  .stop { background: #444; color: white; }
+  .result { background: #16213e; border-radius: 15px; padding: 20px; margin: 10px 0; text-align: center; }
+  .emotion { font-size: 2em; margin: 10px 0; }
+  .message { font-size: 1.2em; color: #a8d8ea; }
+  .meter { background: #333; border-radius: 10px; height: 20px; margin: 5px 0; overflow: hidden; }
+  .meter-fill { height: 100%; border-radius: 10px; transition: width 0.1s; background: linear-gradient(90deg, #e94560, #f5a623); }
+  .stats { display: flex; gap: 10px; margin: 10px 0; }
+  .stat { flex: 1; background: #16213e; border-radius: 10px; padding: 10px; text-align: center; }
+  .stat-value { font-size: 1.5em; font-weight: bold; color: #e94560; }
+  canvas { width: 100%; height: 100px; background: #16213e; border-radius: 10px; display: block; margin: 10px 0; }
+  .history { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; max-height: 200px; overflow-y: auto; }
+  .history-item { padding: 5px 0; border-bottom: 1px solid #333; font-size: 0.9em; }
+  .recording { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 </style>
-""", unsafe_allow_html=True)
+</head>
+<body>
 
-# ----------------------------------------
-# 🐱 猫声を分析する関数
-# ----------------------------------------
-def analyze_cat_voice(audio_path):
-    y, sr = librosa.load(audio_path)
+<h1>🐈 猫翻訳AI</h1>
+<p style="text-align:center">猫の声をリアルタイム解析します</p>
 
-    # ピッチ（音の高さ）を調べる
-    pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
-    pitch_values = pitches[magnitudes > np.median(magnitudes)]
-    pitch = float(np.mean(pitch_values)) if len(pitch_values) > 0 else 0
+<canvas id="waveform"></canvas>
 
-    # 音量を調べる
-    energy = float(np.mean(librosa.feature.rms(y=y)))
+<div class="result" id="result">
+  <div class="emotion" id="emotion">🐱</div>
+  <div class="message" id="message">録音ボタンを押してください</div>
+  <div style="margin:10px 0">信頼度</div>
+  <div class="meter"><div class="meter-fill" id="confidence-bar" style="width:0%"></div></div>
+  <div id="confidence-text">0%</div>
+</div>
 
-    # 音色を調べる（精度アップの秘密兵器）
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-    mfcc_mean = mfcc.mean(axis=1)
+<div class="stats">
+  <div class="stat">
+    <div>🎵 ピッチ</div>
+    <div class="stat-value" id="pitch-val">- Hz</div>
+  </div>
+  <div class="stat">
+    <div>🔊 音量</div>
+    <div class="stat-value" id="energy-val">-</div>
+  </div>
+  <div class="stat">
+    <div>📊 解析回数</div>
+    <div class="stat-value" id="count-val">0</div>
+  </div>
+</div>
 
-    # 感情を判定する
-    if pitch > 800:
-        emotion = "😾 怒り・警戒"
-        message = "「あっちいけ！」「触らないで！」"
-        confidence = 0.85
-    elif pitch > 500 and energy > 0.05:
-        emotion = "😺 要求・お腹すいた"
-        message = "「ごはんちょうだい！」「遊んで！」"
-        confidence = 0.80
-    elif pitch > 300 and energy < 0.03:
-        emotion = "😸 甘え・満足"
-        message = "「なでて〜」「気持ちいい〜」"
-        confidence = 0.75
-    elif energy < 0.02:
-        emotion = "😴 眠い・リラックス"
-        message = "「zzz...」「眠いにゃ」"
-        confidence = 0.70
-    else:
-        emotion = "🐱 おしゃべり"
-        message = "「にゃにゃにゃ〜」"
-        confidence = 0.60
+<button class="btn start" id="startBtn" onclick="startRecording()">🎙 録音開始</button>
+<button class="btn stop" id="stopBtn" onclick="stopRecording()" style="display:none">⏹ 録音停止</button>
 
-    return emotion, message, pitch, energy, confidence, y, sr
+<div class="history" id="history">
+  <strong>📋 翻訳履歴</strong><br>
+</div>
 
-# ----------------------------------------
-# 🖥️ 画面の表示
-# ----------------------------------------
-st.title("🐈 猫翻訳AI")
-st.write("猫の声を録音またはアップロードして感情を解析します")
+<script>
+let audioContext, analyser, microphone, scriptProcessor;
+let isRecording = false;
+let analyzeCount = 0;
+const canvas = document.getElementById('waveform');
+const ctx = canvas.getContext('2d');
+canvas.width = canvas.offsetWidth * 2;
+canvas.height = 200;
 
-# 翻訳履歴を記憶する（ページを更新しても消えない）
-if 'history' not in st.session_state:
-    st.session_state.history = []
+// 猫声を解析する関数
+function analyzeCatVoice(pitchHz, energy) {
+  let emotion, message, confidence;
+  if (pitchHz > 800) {
+    emotion = "😾 怒り・警戒";
+    message = "「あっちいけ！」「触らないで！」";
+    confidence = 0.85;
+  } else if (pitchHz > 500 && energy > 0.05) {
+    emotion = "😺 要求・お腹すいた";
+    message = "「ごはんちょうだい！」「遊んで！」";
+    confidence = 0.80;
+  } else if (pitchHz > 300 && energy < 0.03) {
+    emotion = "😸 甘え・満足";
+    message = "「なでて〜」「気持ちいい〜」";
+    confidence = 0.75;
+  } else if (energy < 0.02) {
+    emotion = "😴 静か・リラックス";
+    message = "「zzz...」「眠いにゃ」";
+    confidence = 0.70;
+  } else {
+    emotion = "🐱 おしゃべり";
+    message = "「にゃにゃにゃ〜」";
+    confidence = 0.60;
+  }
+  return { emotion, message, confidence };
+}
 
-# ----------------------------------------
-# タブで「録音」と「アップロード」を切り替え
-# ----------------------------------------
-tab1, tab2 = st.tabs(["🎙️ 録音する", "📁 ファイルをアップロード"])
+// 録音開始
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new AudioContext();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    microphone = audioContext.createMediaStreamSource(stream);
+    scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
 
-audio_path = None  # 後で使う変数
+    microphone.connect(analyser);
+    analyser.connect(scriptProcessor);
+    scriptProcessor.connect(audioContext.destination);
 
-# === タブ1：録音 ===
-with tab1:
-    st.write("ボタンを押して猫の声を録音してください")
-    audio = audiorecorder("🎙 録音開始", "⏹ 録音停止")
+    isRecording = true;
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'block';
+    document.getElementById('emotion').classList.add('recording');
 
-    if len(audio) > 0:
-        st.audio(audio.export().read())
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            audio.export(tmp.name, format="wav")
-            audio_path = tmp.name
+    let frameCount = 0;
+    // リアルタイム処理
+    scriptProcessor.onaudioprocess = function(e) {
+      const inputData = e.inputBuffer.getChannelData(0);
 
-# === タブ2：ファイルアップロード ===
-with tab2:
-    st.write("iPhoneのボイスメモなどをアップロードしてください")
-    uploaded_file = st.file_uploader("音声ファイル", type=["wav", "mp3", "m4a"])
+      // 音量計算
+      let sum = 0;
+      for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
+      const energy = Math.sqrt(sum / inputData.length);
 
-    if uploaded_file is not None:
-        st.audio(uploaded_file)
-        suffix = "." + uploaded_file.name.split(".")[-1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(uploaded_file.read())
-            audio_path = tmp.name
+      // ピッチ推定（簡易版）
+      const pitch = estimatePitch(inputData, audioContext.sampleRate);
 
-# ----------------------------------------
-# 🔍 分析スタート（録音orアップロードされたら自動で動く）
-# ----------------------------------------
-if audio_path is not None:
+      // 波形描画
+      drawWaveform(inputData);
 
-    # 「分析中...」のアニメーション表示
-    with st.spinner("🧠 猫語を解析中..."):
-        time.sleep(0.5)  # ちょっと待つ（演出）
-        try:
-            emotion, message, pitch, energy, confidence, y, sr = analyze_cat_voice(audio_path)
-        except Exception as e:
-            st.error(f"エラーが出ました: {e}")
-            st.stop()
+      // 0.5秒ごとに解析（毎フレームだと重い）
+      frameCount++;
+      if (frameCount % 12 === 0 && energy > 0.01) {
+        const result = analyzeCatVoice(pitch, energy);
+        updateDisplay(pitch, energy, result);
+      }
+    };
+  } catch(e) {
+    alert('マイクへのアクセスを許可してください！');
+  }
+}
 
-    # ----------------------------------------
-    # 📊 リアルタイムモニタリング表示
-    # ----------------------------------------
-    st.success("✅ 解析完了！")
+// ピッチ推定（自己相関法）
+function estimatePitch(buffer, sampleRate) {
+  const SIZE = buffer.length;
+  let maxCorr = 0, bestOffset = -1;
+  for (let offset = 20; offset < SIZE / 2; offset++) {
+    let corr = 0;
+    for (let i = 0; i < SIZE / 2; i++) corr += buffer[i] * buffer[i + offset];
+    if (corr > maxCorr) { maxCorr = corr; bestOffset = offset; }
+  }
+  return bestOffset > 0 ? sampleRate / bestOffset : 0;
+}
 
-    # 大きく感情を表示
-    st.markdown(f"## {emotion}")
-    st.markdown(f"### {message}")
+// 波形を描画
+function drawWaveform(data) {
+  ctx.fillStyle = '#16213e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#e94560';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const sliceWidth = canvas.width / data.length;
+  let x = 0;
+  for (let i = 0; i < data.length; i++) {
+    const y = (data[i] * canvas.height / 2) + canvas.height / 2;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    x += sliceWidth;
+  }
+  ctx.stroke();
+}
 
-    # 信頼度をバーで表示
-    st.write("**解析の信頼度**")
-    st.progress(confidence)
-    st.write(f"{confidence*100:.0f}%")
+// 画面を更新
+function updateDisplay(pitch, energy, result) {
+  analyzeCount++;
+  document.getElementById('emotion').textContent = result.emotion;
+  document.getElementById('message').textContent = result.message;
+  document.getElementById('confidence-bar').style.width = (result.confidence * 100) + '%';
+  document.getElementById('confidence-text').textContent = (result.confidence * 100).toFixed(0) + '%';
+  document.getElementById('pitch-val').textContent = pitch.toFixed(0) + ' Hz';
+  document.getElementById('energy-val').textContent = energy.toFixed(3);
+  document.getElementById('count-val').textContent = analyzeCount;
 
-    # 数値を2列で表示
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("🎵 ピッチ（音の高さ）", f"{pitch:.0f} Hz")
-    with col2:
-        st.metric("🔊 音量", f"{energy:.4f}")
+  // 履歴に追加
+  const now = new Date().toLocaleTimeString('ja-JP');
+  const history = document.getElementById('history');
+  const item = document.createElement('div');
+  item.className = 'history-item';
+  item.textContent = `${now} ${result.emotion} → ${result.message}`;
+  history.appendChild(item);
+  history.scrollTop = history.scrollHeight;
+}
 
-    # 波形グラフをリアルタイムで表示
-    st.write("**🌊 音声波形**")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        y=y[:2000],
-        mode='lines',
-        line=dict(color='#FF6B6B', width=1),
-        name='波形'
-    ))
-    fig.update_layout(
-        height=200,
-        margin=dict(l=0, r=0, t=10, b=0),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(showgrid=False, zeroline=False),
-    )
-    st.plotly_chart(fig, use_container_width=True)
+// 録音停止
+function stopRecording() {
+  isRecording = false;
+  if (scriptProcessor) scriptProcessor.disconnect();
+  if (microphone) microphone.disconnect();
+  if (audioContext) audioContext.close();
+  document.getElementById('startBtn').style.display = 'block';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('emotion').classList.remove('recording');
+}
+</script>
+</body>
+</html>
+```
 
-    # ----------------------------------------
-    # 📝 翻訳履歴に追加して表示
-    # ----------------------------------------
-    st.session_state.history.append({
-        'time': time.strftime('%H:%M:%S'),
-        'emotion': emotion,
-        'message': message,
-        'confidence': confidence
-    })
+**③ 「Commit changes」で保存**
 
-    st.write("---")
-    st.write("**📋 翻訳履歴（新しい順）**")
-    for h in reversed(st.session_state.history[-10:]):  # 最新10件
-        st.write(f"`{h['time']}` {h['emotion']} → {h['message']} （信頼度{h['confidence']*100:.0f}%）")
+**④ GitHub Pagesを有効にする**
 
-    # 履歴をリセットするボタン
-    if st.button("🗑️ 履歴をリセット"):
-        st.session_state.history = []
-        st.rerun()
-        
+リポジトリの **Settings → Pages → Branch: main → Save**
+
+---
+
+## 完成後のURL
+```
+https://lemlemray.github.io/catvoice/
