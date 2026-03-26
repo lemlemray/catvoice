@@ -3,86 +3,256 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>猫翻訳AI リアルタイム</title>
+<title>猫翻訳AI</title>
 <style>
   body { font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #1a1a2e; color: white; }
   h1 { text-align: center; font-size: 2em; }
-  .btn { width: 100%; padding: 20px; font-size: 1.5em; border: none; border-radius: 15px; cursor: pointer; margin: 10px 0; }
+  .btn { width: 100%; padding: 15px; font-size: 1.2em; border: none; border-radius: 15px; cursor: pointer; margin: 8px 0; }
   .start { background: #e94560; color: white; }
   .stop { background: #444; color: white; }
   .result { background: #16213e; border-radius: 15px; padding: 20px; margin: 10px 0; text-align: center; }
   .emotion { font-size: 2em; margin: 10px 0; }
   .message { font-size: 1.2em; color: #a8d8ea; }
   .meter { background: #333; border-radius: 10px; height: 20px; margin: 5px 0; overflow: hidden; }
-  .meter-fill { height: 100%; border-radius: 10px; transition: width 0.1s; background: linear-gradient(90deg, #e94560, #f5a623); }
+  .meter-fill { height: 100%; border-radius: 10px; transition: width 0.3s; background: linear-gradient(90deg, #e94560, #f5a623); }
   .stats { display: flex; gap: 10px; margin: 10px 0; }
   .stat { flex: 1; background: #16213e; border-radius: 10px; padding: 10px; text-align: center; }
-  .stat-value { font-size: 1.5em; font-weight: bold; color: #e94560; }
+  .stat-value { font-size: 1.3em; font-weight: bold; color: #e94560; }
   canvas { width: 100%; height: 100px; background: #16213e; border-radius: 10px; display: block; margin: 10px 0; }
   .history { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; max-height: 200px; overflow-y: auto; }
   .history-item { padding: 5px 0; border-bottom: 1px solid #333; font-size: 0.9em; }
   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
   .recording { animation: pulse 1s infinite; }
+
+  /* フィードバックボタン */
+  .feedback { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; text-align: center; display: none; }
+  .fb-title { font-size: 1em; margin-bottom: 10px; color: #aaa; }
+  .fb-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .fb-btn { padding: 8px 15px; border: none; border-radius: 10px; cursor: pointer; font-size: 0.9em; }
+  .fb-correct { background: #27ae60; color: white; }
+  .fb-wrong { background: #e94560; color: white; }
+  .fb-choice { background: #2c3e50; color: white; border: 1px solid #555; }
+  .fb-choice:hover { background: #e94560; }
+
+  /* 学習状況 */
+  .learning { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; }
+  .learn-title { font-size: 1em; color: #f5a623; margin-bottom: 10px; }
+  .learn-bar { margin: 5px 0; }
+  .learn-label { font-size: 0.85em; display: flex; justify-content: space-between; }
+  .learn-meter { background: #333; border-radius: 5px; height: 10px; margin: 3px 0; overflow: hidden; }
+  .learn-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #e94560, #f5a623); transition: width 0.5s; }
 </style>
 </head>
 <body>
 
 <h1>猫翻訳AI</h1>
-<p style="text-align:center">猫の声をリアルタイム解析します</p>
+<p style="text-align:center;color:#aaa">録音しながらリアルタイム解析＋自己学習</p>
 
 <canvas id="waveform"></canvas>
 
 <div class="result">
-  <div class="emotion recording" id="emotion">猫</div>
+  <div class="emotion" id="emotion">猫</div>
   <div class="message" id="message">録音ボタンを押してください</div>
-  <div style="margin:10px 0">信頼度</div>
+  <div style="margin:10px 0;color:#aaa">信頼度</div>
   <div class="meter"><div class="meter-fill" id="confidence-bar" style="width:0%"></div></div>
   <div id="confidence-text">0%</div>
 </div>
 
+<!-- フィードバックボタン -->
+<div class="feedback" id="feedback">
+  <div class="fb-title">この結果は正しいですか？</div>
+  <div class="fb-btns">
+    <button class="fb-btn fb-correct" onclick="sendFeedback(true)">正しい</button>
+    <button class="fb-btn fb-wrong" onclick="showChoices()">違う</button>
+  </div>
+  <div id="choices" style="display:none;margin-top:10px">
+    <div style="color:#aaa;margin-bottom:8px">正解はどれですか？</div>
+    <div class="fb-btns">
+      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'怒り・警戒')">怒り・警戒</button>
+      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'要求・お腹すいた')">要求・お腹すいた</button>
+      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'甘え・満足')">甘え・満足</button>
+      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'眠い・リラックス')">眠い・リラックス</button>
+      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'おしゃべり')">おしゃべり</button>
+    </div>
+  </div>
+</div>
+
 <div class="stats">
-  <div class="stat">
-    <div>ピッチ</div>
-    <div class="stat-value" id="pitch-val">- Hz</div>
-  </div>
-  <div class="stat">
-    <div>音量</div>
-    <div class="stat-value" id="energy-val">-</div>
-  </div>
-  <div class="stat">
-    <div>解析回数</div>
-    <div class="stat-value" id="count-val">0</div>
-  </div>
+  <div class="stat"><div>ピッチ</div><div class="stat-value" id="pitch-val">- Hz</div></div>
+  <div class="stat"><div>音量</div><div class="stat-value" id="energy-val">-</div></div>
+  <div class="stat"><div>解析回数</div><div class="stat-value" id="count-val">0</div></div>
 </div>
 
 <button class="btn start" id="startBtn" onclick="startRecording()">録音開始</button>
 <button class="btn stop" id="stopBtn" onclick="stopRecording()" style="display:none">録音停止</button>
+
+<!-- 学習状況 -->
+<div class="learning">
+  <div class="learn-title">🧠 学習状況（フィードバックで精度アップ！）</div>
+  <div id="learn-stats"></div>
+  <div style="color:#aaa;font-size:0.8em;margin-top:8px">合計フィードバック: <span id="total-fb">0</span>件 / 正解率: <span id="accuracy">-%</span></div>
+</div>
 
 <div class="history" id="history">
   <strong>翻訳履歴</strong><br>
 </div>
 
 <script>
+// ==========================================
+// データ管理（ブラウザに記憶させる）
+// ==========================================
+let learnData = JSON.parse(localStorage.getItem('catLearnData') || JSON.stringify({
+  thresholds: {
+    angerPitch: 800,
+    demandPitch: 500,
+    demandEnergy: 0.05,
+    contentPitch: 300,
+    contentEnergy: 0.03,
+    sleepEnergy: 0.02
+  },
+  feedback: [],
+  correct: 0,
+  total: 0
+}));
+
+function saveLearnData() {
+  localStorage.setItem('catLearnData', JSON.stringify(learnData));
+  updateLearningDisplay();
+}
+
+// ==========================================
+// 猫声解析（学習データを使う）
+// ==========================================
+let lastPitch = 0;
+let lastEnergy = 0;
+let lastEmotion = '';
+
+function analyzeCatVoice(pitchHz, energy) {
+  const t = learnData.thresholds;
+  let emotion, message, confidence;
+
+  if (pitchHz > t.angerPitch) {
+    emotion = '怒り・警戒';
+    message = '「あっちいけ！」「触らないで！」';
+    confidence = 0.85;
+  } else if (pitchHz > t.demandPitch && energy > t.demandEnergy) {
+    emotion = '要求・お腹すいた';
+    message = '「ごはんちょうだい！」「遊んで！」';
+    confidence = 0.80;
+  } else if (pitchHz > t.contentPitch && energy < t.contentEnergy) {
+    emotion = '甘え・満足';
+    message = '「なでて〜」「気持ちいい〜」';
+    confidence = 0.75;
+  } else if (energy < t.sleepEnergy) {
+    emotion = '眠い・リラックス';
+    message = '「zzz...」「眠いにゃ」';
+    confidence = 0.70;
+  } else {
+    emotion = 'おしゃべり';
+    message = '「にゃにゃにゃ〜」';
+    confidence = 0.60;
+  }
+
+  lastPitch = pitchHz;
+  lastEnergy = energy;
+  lastEmotion = emotion;
+  return { emotion, message, confidence };
+}
+
+// ==========================================
+// フィードバック処理（ここが学習の核心！）
+// ==========================================
+function sendFeedback(isCorrect, correctEmotion) {
+  learnData.total++;
+
+  if (isCorrect) {
+    learnData.correct++;
+    document.getElementById('feedback').style.display = 'none';
+    showToast('ありがとう！学習しました');
+  } else {
+    // 正解感情に合わせてしきい値を自動調整
+    adjustThresholds(correctEmotion, lastPitch, lastEnergy);
+    learnData.feedback.push({
+      pitch: lastPitch,
+      energy: lastEnergy,
+      predicted: lastEmotion,
+      correct: correctEmotion,
+      time: new Date().toISOString()
+    });
+    document.getElementById('feedback').style.display = 'none';
+    document.getElementById('choices').style.display = 'none';
+    showToast('学習しました！次から精度アップ！');
+  }
+
+  saveLearnData();
+}
+
+function adjustThresholds(correctEmotion, pitch, energy) {
+  const t = learnData.thresholds;
+  const step = 0.05; // 少しずつ調整
+
+  if (correctEmotion === '怒り・警戒') {
+    // ピッチのしきい値を今の値に近づける
+    t.angerPitch = t.angerPitch * (1 - step) + pitch * step;
+  } else if (correctEmotion === '要求・お腹すいた') {
+    t.demandPitch = t.demandPitch * (1 - step) + pitch * step;
+    t.demandEnergy = t.demandEnergy * (1 - step) + energy * step;
+  } else if (correctEmotion === '甘え・満足') {
+    t.contentPitch = t.contentPitch * (1 - step) + pitch * step;
+    t.contentEnergy = t.contentEnergy * (1 - step) + energy * step;
+  } else if (correctEmotion === '眠い・リラックス') {
+    t.sleepEnergy = t.sleepEnergy * (1 - step) + energy * step;
+  }
+}
+
+function showChoices() {
+  document.getElementById('choices').style.display = 'block';
+}
+
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:20px;font-size:1em;z-index:999;';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// ==========================================
+// 学習状況の表示
+// ==========================================
+function updateLearningDisplay() {
+  const t = learnData.thresholds;
+  const accuracy = learnData.total > 0 ? (learnData.correct / learnData.total * 100).toFixed(0) : '-';
+
+  document.getElementById('total-fb').textContent = learnData.total;
+  document.getElementById('accuracy').textContent = accuracy + '%';
+
+  const stats = document.getElementById('learn-stats');
+  stats.innerHTML = `
+    <div class="learn-bar">
+      <div class="learn-label"><span>怒りしきい値</span><span>${t.angerPitch.toFixed(0)} Hz</span></div>
+      <div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.angerPitch/20,100)}%"></div></div>
+    </div>
+    <div class="learn-bar">
+      <div class="learn-label"><span>要求しきい値</span><span>${t.demandPitch.toFixed(0)} Hz</span></div>
+      <div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.demandPitch/20,100)}%"></div></div>
+    </div>
+    <div class="learn-bar">
+      <div class="learn-label"><span>甘えしきい値</span><span>${t.contentPitch.toFixed(0)} Hz</span></div>
+      <div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.contentPitch/20,100)}%"></div></div>
+    </div>
+  `;
+}
+
+// ==========================================
+// 録音・音声処理
+// ==========================================
 let audioContext, analyser, microphone, scriptProcessor;
 let analyzeCount = 0;
 const canvas = document.getElementById('waveform');
 const ctx = canvas.getContext('2d');
 canvas.width = 800;
 canvas.height = 200;
-
-function analyzeCatVoice(pitchHz, energy) {
-  if (pitchHz > 800) {
-    return { emotion: "怒り・警戒", message: "「あっちいけ！」「触らないで！」", confidence: 0.85 };
-  } else if (pitchHz > 500 && energy > 0.05) {
-    return { emotion: "要求・お腹すいた", message: "「ごはんちょうだい！」「遊んで！」", confidence: 0.80 };
-  } else if (pitchHz > 300 && energy < 0.03) {
-    return { emotion: "甘え・満足", message: "「なでて〜」「気持ちいい〜」", confidence: 0.75 };
-  } else if (energy < 0.02) {
-    return { emotion: "眠い・リラックス", message: "「zzz...」「眠いにゃ」", confidence: 0.70 };
-  } else {
-    return { emotion: "おしゃべり", message: "「にゃにゃにゃ〜」", confidence: 0.60 };
-  }
-}
 
 async function startRecording() {
   try {
@@ -97,6 +267,7 @@ async function startRecording() {
     scriptProcessor.connect(audioContext.destination);
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('stopBtn').style.display = 'block';
+    document.getElementById('feedback').style.display = 'none';
 
     let frameCount = 0;
     scriptProcessor.onaudioprocess = function(e) {
@@ -152,6 +323,11 @@ function updateDisplay(pitch, energy, result) {
   document.getElementById('pitch-val').textContent = pitch.toFixed(0) + ' Hz';
   document.getElementById('energy-val').textContent = energy.toFixed(3);
   document.getElementById('count-val').textContent = analyzeCount;
+
+  // フィードバックボタンを表示
+  document.getElementById('feedback').style.display = 'block';
+  document.getElementById('choices').style.display = 'none';
+
   const now = new Date().toLocaleTimeString('ja-JP');
   const history = document.getElementById('history');
   const item = document.createElement('div');
@@ -168,6 +344,21 @@ function stopRecording() {
   document.getElementById('startBtn').style.display = 'block';
   document.getElementById('stopBtn').style.display = 'none';
 }
+
+// 起動時に学習状況を表示
+updateLearningDisplay();
 </script>
 </body>
 </html>
+```
+
+**⑤「Commit changes」で保存**
+
+---
+
+### これで何が変わる？
+
+解析結果が出るたびに👇が表示されます
+```
+この結果は正しいですか？
+[正しい ✅]  [違う ❌]
