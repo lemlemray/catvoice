@@ -12,53 +12,52 @@
   .stop { background: #444; color: white; }
   .result { background: #16213e; border-radius: 15px; padding: 20px; margin: 10px 0; text-align: center; }
   .emotion { font-size: 2em; margin: 10px 0; }
-  .message { font-size: 1.2em; color: #a8d8ea; }
+  .message { font-size: 1.1em; color: #a8d8ea; }
+  .sub-message { font-size: 0.9em; color: #888; margin-top: 5px; }
   .meter { background: #333; border-radius: 10px; height: 20px; margin: 5px 0; overflow: hidden; }
   .meter-fill { height: 100%; border-radius: 10px; transition: width 0.3s; background: linear-gradient(90deg, #e94560, #f5a623); }
-  .stats { display: flex; gap: 10px; margin: 10px 0; }
-  .stat { flex: 1; background: #16213e; border-radius: 10px; padding: 10px; text-align: center; }
-  .stat-value { font-size: 1.3em; font-weight: bold; color: #e94560; }
-  canvas { width: 100%; height: 100px; background: #16213e; border-radius: 10px; display: block; margin: 10px 0; }
-  .history { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; max-height: 200px; overflow-y: auto; }
-  .history-item { padding: 5px 0; border-bottom: 1px solid #333; font-size: 0.9em; }
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  .stats { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 80px; background: #16213e; border-radius: 10px; padding: 8px; text-align: center; }
+  .stat-value { font-size: 1.1em; font-weight: bold; color: #e94560; }
+  canvas { width: 100%; height: 80px; background: #16213e; border-radius: 10px; display: block; margin: 10px 0; }
+  .history { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; max-height: 150px; overflow-y: auto; }
+  .history-item { padding: 4px 0; border-bottom: 1px solid #333; font-size: 0.85em; }
+  @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:0.5;} }
   .recording { animation: pulse 1s infinite; }
-
-  /* フィードバックボタン */
   .feedback { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; text-align: center; display: none; }
-  .fb-title { font-size: 1em; margin-bottom: 10px; color: #aaa; }
+  .fb-title { font-size: 0.95em; margin-bottom: 10px; color: #aaa; }
   .fb-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-  .fb-btn { padding: 8px 15px; border: none; border-radius: 10px; cursor: pointer; font-size: 0.9em; }
+  .fb-btn { padding: 8px 14px; border: none; border-radius: 10px; cursor: pointer; font-size: 0.85em; }
   .fb-correct { background: #27ae60; color: white; }
   .fb-wrong { background: #e94560; color: white; }
-  .fb-choice { background: #2c3e50; color: white; border: 1px solid #555; }
+  .fb-choice { background: #2c3e50; color: white; border: 1px solid #555; margin: 4px; }
   .fb-choice:hover { background: #e94560; }
-
-  /* 学習状況 */
   .learning { background: #16213e; border-radius: 15px; padding: 15px; margin: 10px 0; }
-  .learn-title { font-size: 1em; color: #f5a623; margin-bottom: 10px; }
-  .learn-bar { margin: 5px 0; }
-  .learn-label { font-size: 0.85em; display: flex; justify-content: space-between; }
-  .learn-meter { background: #333; border-radius: 5px; height: 10px; margin: 3px 0; overflow: hidden; }
+  .learn-title { font-size: 0.95em; color: #f5a623; margin-bottom: 8px; }
+  .learn-bar { margin: 4px 0; }
+  .learn-label { font-size: 0.8em; display: flex; justify-content: space-between; }
+  .learn-meter { background: #333; border-radius: 5px; height: 8px; margin: 2px 0; overflow: hidden; }
   .learn-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #e94560, #f5a623); transition: width 0.5s; }
+  .ai-badge { background: #f5a623; color: #1a1a2e; border-radius: 5px; padding: 2px 6px; font-size: 0.75em; font-weight: bold; }
+  .loading { color: #f5a623; font-size: 0.9em; }
 </style>
 </head>
 <body>
 
 <h1>猫翻訳AI</h1>
-<p style="text-align:center;color:#aaa">録音しながらリアルタイム解析＋自己学習</p>
+<p style="text-align:center;color:#aaa">リアルタイム解析＋AI分析＋自己学習</p>
 
 <canvas id="waveform"></canvas>
 
 <div class="result">
-  <div class="emotion" id="emotion">猫</div>
+  <div class="emotion recording" id="emotion">猫</div>
   <div class="message" id="message">録音ボタンを押してください</div>
-  <div style="margin:10px 0;color:#aaa">信頼度</div>
+  <div class="sub-message" id="sub-message"></div>
+  <div style="margin:10px 0;color:#aaa;font-size:0.9em">信頼度</div>
   <div class="meter"><div class="meter-fill" id="confidence-bar" style="width:0%"></div></div>
   <div id="confidence-text">0%</div>
 </div>
 
-<!-- フィードバックボタン -->
 <div class="feedback" id="feedback">
   <div class="fb-title">この結果は正しいですか？</div>
   <div class="fb-btns">
@@ -66,31 +65,27 @@
     <button class="fb-btn fb-wrong" onclick="showChoices()">違う</button>
   </div>
   <div id="choices" style="display:none;margin-top:10px">
-    <div style="color:#aaa;margin-bottom:8px">正解はどれですか？</div>
-    <div class="fb-btns">
-      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'怒り・警戒')">怒り・警戒</button>
-      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'要求・お腹すいた')">要求・お腹すいた</button>
-      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'甘え・満足')">甘え・満足</button>
-      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'眠い・リラックス')">眠い・リラックス</button>
-      <button class="fb-btn fb-choice" onclick="sendFeedback(false,'おしゃべり')">おしゃべり</button>
-    </div>
+    <div style="color:#aaa;margin-bottom:8px;font-size:0.9em">正解はどれですか？</div>
+    <div class="fb-btns" id="choice-buttons"></div>
   </div>
 </div>
 
 <div class="stats">
-  <div class="stat"><div>ピッチ</div><div class="stat-value" id="pitch-val">- Hz</div></div>
-  <div class="stat"><div>音量</div><div class="stat-value" id="energy-val">-</div></div>
-  <div class="stat"><div>解析回数</div><div class="stat-value" id="count-val">0</div></div>
+  <div class="stat"><div style="font-size:0.8em">ピッチ</div><div class="stat-value" id="pitch-val">-</div></div>
+  <div class="stat"><div style="font-size:0.8em">音量</div><div class="stat-value" id="energy-val">-</div></div>
+  <div class="stat"><div style="font-size:0.8em">変化量</div><div class="stat-value" id="variation-val">-</div></div>
+  <div class="stat"><div style="font-size:0.8em">解析回数</div><div class="stat-value" id="count-val">0</div></div>
 </div>
 
 <button class="btn start" id="startBtn" onclick="startRecording()">録音開始</button>
 <button class="btn stop" id="stopBtn" onclick="stopRecording()" style="display:none">録音停止</button>
 
-<!-- 学習状況 -->
 <div class="learning">
-  <div class="learn-title">🧠 学習状況（フィードバックで精度アップ！）</div>
+  <div class="learn-title">🧠 学習状況</div>
   <div id="learn-stats"></div>
-  <div style="color:#aaa;font-size:0.8em;margin-top:8px">合計フィードバック: <span id="total-fb">0</span>件 / 正解率: <span id="accuracy">-%</span></div>
+  <div style="color:#aaa;font-size:0.8em;margin-top:8px">
+    フィードバック: <span id="total-fb">0</span>件 / 正解率: <span id="accuracy">-%</span>
+  </div>
 </div>
 
 <div class="history" id="history">
@@ -99,16 +94,33 @@
 
 <script>
 // ==========================================
-// データ管理（ブラウザに記憶させる）
+// 感情の定義（9種類）
 // ==========================================
-let learnData = JSON.parse(localStorage.getItem('catLearnData') || JSON.stringify({
+const EMOTIONS = {
+  '怒り・警戒':     { icon: '😾', message: '「あっちいけ！」「触らないで！」',     sub: '低く唸るような声、耳を後ろに倒している可能性', color: '#e74c3c' },
+  '要求・催促':     { icon: '😺', message: '「ごはんちょうだい！」「早く！」',       sub: '繰り返し鳴く、目を大きく開けている可能性',     color: '#e67e22' },
+  '甘え・満足':     { icon: '😸', message: '「なでて〜」「大好き〜」',               sub: 'ゴロゴロと喉を鳴らしている可能性',             color: '#2ecc71' },
+  '眠い・リラックス':{ icon: '😴', message: '「zzz...」「眠いにゃ」',               sub: 'まぶたが重そう、丸くなっている可能性',         color: '#3498db' },
+  'おしゃべり':     { icon: '🐱', message: '「にゃにゃにゃ〜」「ねえねえ！」',       sub: '何かを伝えようとしている',                     color: '#9b59b6' },
+  '病気・痛み':     { icon: '🤒', message: '「助けて...」「痛いにゃ...」',           sub: '要注意！獣医師への相談を検討してください',     color: '#c0392b' },
+  '恋しさ・寂しさ': { icon: '🥺', message: '「どこにいるの？」「寂しいよ〜」',       sub: '飼い主を探している、構ってほしいサイン',       color: '#e91e63' },
+  '縄張り・威嚇':   { icon: '🦁', message: '「ここは俺の場所だ！」「来るな！」',     sub: '他の猫や動物に対して警戒している',             color: '#f39c12' },
+  '怯え・ストレス': { icon: '😰', message: '「怖いよ〜」「逃げたい！」',             sub: '安全な場所に隠れさせてあげてください',         color: '#1abc9c' },
+};
+
+// ==========================================
+// 学習データ
+// ==========================================
+let learnData = JSON.parse(localStorage.getItem('catLearnData_v2') || JSON.stringify({
   thresholds: {
     angerPitch: 800,
-    demandPitch: 500,
-    demandEnergy: 0.05,
-    contentPitch: 300,
-    contentEnergy: 0.03,
-    sleepEnergy: 0.02
+    demandPitch: 500, demandEnergy: 0.05,
+    contentPitch: 300, contentEnergy: 0.03,
+    sleepEnergy: 0.02,
+    painVariation: 0.8,
+    lonelyPitch: 400, lonelyEnergy: 0.025,
+    territoryPitch: 600, territoryDuration: 3,
+    fearEnergy: 0.01
   },
   feedback: [],
   correct: 0,
@@ -116,131 +128,130 @@ let learnData = JSON.parse(localStorage.getItem('catLearnData') || JSON.stringif
 }));
 
 function saveLearnData() {
-  localStorage.setItem('catLearnData', JSON.stringify(learnData));
+  localStorage.setItem('catLearnData_v2', JSON.stringify(learnData));
   updateLearningDisplay();
 }
 
 // ==========================================
-// 猫声解析（学習データを使う）
+// 音声特徴量
 // ==========================================
-let lastPitch = 0;
-let lastEnergy = 0;
-let lastEmotion = '';
+let lastPitch = 0, lastEnergy = 0, lastVariation = 0, lastEmotion = '';
+let pitchHistory = [];
 
-function analyzeCatVoice(pitchHz, energy) {
+// ==========================================
+// 猫声解析（ルールベース）
+// ==========================================
+function analyzeCatVoice(pitchHz, energy, variation) {
   const t = learnData.thresholds;
-  let emotion, message, confidence;
+  let emotion, confidence;
 
-  if (pitchHz > t.angerPitch) {
-    emotion = '怒り・警戒';
-    message = '「あっちいけ！」「触らないで！」';
-    confidence = 0.85;
+  // ピッチ履歴に追加
+  pitchHistory.push(pitchHz);
+  if (pitchHistory.length > 20) pitchHistory.shift();
+  const pitchStd = standardDeviation(pitchHistory);
+
+  if (energy < t.fearEnergy && pitchHz > 200) {
+    emotion = '怯え・ストレス'; confidence = 0.75;
+  } else if (variation > t.painVariation && energy > 0.03) {
+    emotion = '病気・痛み'; confidence = 0.70;
+  } else if (pitchHz > t.angerPitch && energy > 0.06) {
+    emotion = '縄張り・威嚇'; confidence = 0.80;
+  } else if (pitchHz > t.angerPitch) {
+    emotion = '怒り・警戒'; confidence = 0.85;
   } else if (pitchHz > t.demandPitch && energy > t.demandEnergy) {
-    emotion = '要求・お腹すいた';
-    message = '「ごはんちょうだい！」「遊んで！」';
-    confidence = 0.80;
+    emotion = '要求・催促'; confidence = 0.80;
+  } else if (pitchHz > t.lonelyPitch && energy < t.lonelyEnergy && pitchStd > 50) {
+    emotion = '恋しさ・寂しさ'; confidence = 0.72;
   } else if (pitchHz > t.contentPitch && energy < t.contentEnergy) {
-    emotion = '甘え・満足';
-    message = '「なでて〜」「気持ちいい〜」';
-    confidence = 0.75;
+    emotion = '甘え・満足'; confidence = 0.75;
   } else if (energy < t.sleepEnergy) {
-    emotion = '眠い・リラックス';
-    message = '「zzz...」「眠いにゃ」';
-    confidence = 0.70;
+    emotion = '眠い・リラックス'; confidence = 0.70;
   } else {
-    emotion = 'おしゃべり';
-    message = '「にゃにゃにゃ〜」';
-    confidence = 0.60;
+    emotion = 'おしゃべり'; confidence = 0.60;
   }
 
-  lastPitch = pitchHz;
-  lastEnergy = energy;
-  lastEmotion = emotion;
-  return { emotion, message, confidence };
+  lastPitch = pitchHz; lastEnergy = energy;
+  lastVariation = variation; lastEmotion = emotion;
+  return { emotion, confidence };
+}
+
+function standardDeviation(arr) {
+  if (arr.length < 2) return 0;
+  const mean = arr.reduce((a,b) => a+b, 0) / arr.length;
+  return Math.sqrt(arr.reduce((a,b) => a + (b-mean)**2, 0) / arr.length);
 }
 
 // ==========================================
-// フィードバック処理（ここが学習の核心！）
+// フィードバック＆学習
 // ==========================================
 function sendFeedback(isCorrect, correctEmotion) {
   learnData.total++;
-
   if (isCorrect) {
     learnData.correct++;
-    document.getElementById('feedback').style.display = 'none';
     showToast('ありがとう！学習しました');
   } else {
-    // 正解感情に合わせてしきい値を自動調整
-    adjustThresholds(correctEmotion, lastPitch, lastEnergy);
+    adjustThresholds(correctEmotion, lastPitch, lastEnergy, lastVariation);
     learnData.feedback.push({
-      pitch: lastPitch,
-      energy: lastEnergy,
-      predicted: lastEmotion,
-      correct: correctEmotion,
+      pitch: lastPitch, energy: lastEnergy,
+      predicted: lastEmotion, correct: correctEmotion,
       time: new Date().toISOString()
     });
-    document.getElementById('feedback').style.display = 'none';
-    document.getElementById('choices').style.display = 'none';
     showToast('学習しました！次から精度アップ！');
   }
-
+  document.getElementById('feedback').style.display = 'none';
+  document.getElementById('choices').style.display = 'none';
   saveLearnData();
 }
 
-function adjustThresholds(correctEmotion, pitch, energy) {
+function adjustThresholds(emotion, pitch, energy, variation) {
   const t = learnData.thresholds;
-  const step = 0.05; // 少しずつ調整
-
-  if (correctEmotion === '怒り・警戒') {
-    // ピッチのしきい値を今の値に近づける
-    t.angerPitch = t.angerPitch * (1 - step) + pitch * step;
-  } else if (correctEmotion === '要求・お腹すいた') {
-    t.demandPitch = t.demandPitch * (1 - step) + pitch * step;
-    t.demandEnergy = t.demandEnergy * (1 - step) + energy * step;
-  } else if (correctEmotion === '甘え・満足') {
-    t.contentPitch = t.contentPitch * (1 - step) + pitch * step;
-    t.contentEnergy = t.contentEnergy * (1 - step) + energy * step;
-  } else if (correctEmotion === '眠い・リラックス') {
-    t.sleepEnergy = t.sleepEnergy * (1 - step) + energy * step;
-  }
+  const s = 0.08;
+  if (emotion === '怒り・警戒')     t.angerPitch     = lerp(t.angerPitch, pitch, s);
+  if (emotion === '要求・催促')     { t.demandPitch  = lerp(t.demandPitch, pitch, s); t.demandEnergy = lerp(t.demandEnergy, energy, s); }
+  if (emotion === '甘え・満足')     { t.contentPitch = lerp(t.contentPitch, pitch, s); t.contentEnergy = lerp(t.contentEnergy, energy, s); }
+  if (emotion === '眠い・リラックス') t.sleepEnergy   = lerp(t.sleepEnergy, energy, s);
+  if (emotion === '病気・痛み')     t.painVariation  = lerp(t.painVariation, variation, s);
+  if (emotion === '恋しさ・寂しさ') { t.lonelyPitch  = lerp(t.lonelyPitch, pitch, s); t.lonelyEnergy = lerp(t.lonelyEnergy, energy, s); }
+  if (emotion === '縄張り・威嚇')   t.territoryPitch = lerp(t.territoryPitch, pitch, s);
+  if (emotion === '怯え・ストレス') t.fearEnergy     = lerp(t.fearEnergy, energy, s);
 }
 
+function lerp(a, b, t) { return a * (1 - t) + b * t; }
+
 function showChoices() {
+  const div = document.getElementById('choice-buttons');
+  div.innerHTML = '';
+  Object.keys(EMOTIONS).forEach(e => {
+    const btn = document.createElement('button');
+    btn.className = 'fb-btn fb-choice';
+    btn.textContent = EMOTIONS[e].icon + ' ' + e;
+    btn.onclick = () => sendFeedback(false, e);
+    div.appendChild(btn);
+  });
   document.getElementById('choices').style.display = 'block';
 }
 
 function showToast(msg) {
-  const toast = document.createElement('div');
-  toast.textContent = msg;
-  toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:20px;font-size:1em;z-index:999;';
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:20px;font-size:1em;z-index:999;';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
 }
 
 // ==========================================
-// 学習状況の表示
+// 学習状況表示
 // ==========================================
 function updateLearningDisplay() {
-  const t = learnData.thresholds;
   const accuracy = learnData.total > 0 ? (learnData.correct / learnData.total * 100).toFixed(0) : '-';
-
   document.getElementById('total-fb').textContent = learnData.total;
   document.getElementById('accuracy').textContent = accuracy + '%';
-
-  const stats = document.getElementById('learn-stats');
-  stats.innerHTML = `
-    <div class="learn-bar">
-      <div class="learn-label"><span>怒りしきい値</span><span>${t.angerPitch.toFixed(0)} Hz</span></div>
-      <div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.angerPitch/20,100)}%"></div></div>
-    </div>
-    <div class="learn-bar">
-      <div class="learn-label"><span>要求しきい値</span><span>${t.demandPitch.toFixed(0)} Hz</span></div>
-      <div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.demandPitch/20,100)}%"></div></div>
-    </div>
-    <div class="learn-bar">
-      <div class="learn-label"><span>甘えしきい値</span><span>${t.contentPitch.toFixed(0)} Hz</span></div>
-      <div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.contentPitch/20,100)}%"></div></div>
-    </div>
+  const t = learnData.thresholds;
+  document.getElementById('learn-stats').innerHTML = `
+    <div class="learn-bar"><div class="learn-label"><span>怒りしきい値</span><span>${t.angerPitch.toFixed(0)}Hz</span></div><div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.angerPitch/15,100)}%"></div></div></div>
+    <div class="learn-bar"><div class="learn-label"><span>要求しきい値</span><span>${t.demandPitch.toFixed(0)}Hz</span></div><div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.demandPitch/15,100)}%"></div></div></div>
+    <div class="learn-bar"><div class="learn-label"><span>甘えしきい値</span><span>${t.contentPitch.toFixed(0)}Hz</span></div><div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.contentPitch/15,100)}%"></div></div></div>
+    <div class="learn-bar"><div class="learn-label"><span>怯えしきい値</span><span>${(t.fearEnergy*1000).toFixed(1)}</span></div><div class="learn-meter"><div class="learn-fill" style="width:${Math.min(t.fearEnergy*2000,100)}%"></div></div></div>
   `;
 }
 
@@ -251,8 +262,7 @@ let audioContext, analyser, microphone, scriptProcessor;
 let analyzeCount = 0;
 const canvas = document.getElementById('waveform');
 const ctx = canvas.getContext('2d');
-canvas.width = 800;
-canvas.height = 200;
+canvas.width = 800; canvas.height = 160;
 
 async function startRecording() {
   try {
@@ -270,17 +280,20 @@ async function startRecording() {
     document.getElementById('feedback').style.display = 'none';
 
     let frameCount = 0;
+    let prevEnergy = 0;
     scriptProcessor.onaudioprocess = function(e) {
-      const inputData = e.inputBuffer.getChannelData(0);
+      const data = e.inputBuffer.getChannelData(0);
       let sum = 0;
-      for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
-      const energy = Math.sqrt(sum / inputData.length);
-      const pitch = estimatePitch(inputData, audioContext.sampleRate);
-      drawWaveform(inputData);
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const energy = Math.sqrt(sum / data.length);
+      const variation = Math.abs(energy - prevEnergy) * 100;
+      prevEnergy = energy;
+      const pitch = estimatePitch(data, audioContext.sampleRate);
+      drawWaveform(data);
       frameCount++;
-      if (frameCount % 12 === 0 && energy > 0.01) {
-        const result = analyzeCatVoice(pitch, energy);
-        updateDisplay(pitch, energy, result);
+      if (frameCount % 12 === 0 && energy > 0.005) {
+        const result = analyzeCatVoice(pitch, energy, variation);
+        updateDisplay(pitch, energy, variation, result);
       }
     };
   } catch(e) {
@@ -304,27 +317,28 @@ function drawWaveform(data) {
   ctx.strokeStyle = '#e94560';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  const sliceWidth = canvas.width / data.length;
+  const sw = canvas.width / data.length;
   let x = 0;
   for (let i = 0; i < data.length; i++) {
     const y = (data[i] * canvas.height / 2) + canvas.height / 2;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    x += sliceWidth;
+    x += sw;
   }
   ctx.stroke();
 }
 
-function updateDisplay(pitch, energy, result) {
+function updateDisplay(pitch, energy, variation, result) {
   analyzeCount++;
-  document.getElementById('emotion').textContent = result.emotion;
-  document.getElementById('message').textContent = result.message;
+  const e = EMOTIONS[result.emotion];
+  document.getElementById('emotion').textContent = e.icon + ' ' + result.emotion;
+  document.getElementById('message').textContent = e.message;
+  document.getElementById('sub-message').textContent = e.sub;
   document.getElementById('confidence-bar').style.width = (result.confidence * 100) + '%';
   document.getElementById('confidence-text').textContent = (result.confidence * 100).toFixed(0) + '%';
-  document.getElementById('pitch-val').textContent = pitch.toFixed(0) + ' Hz';
+  document.getElementById('pitch-val').textContent = pitch.toFixed(0) + 'Hz';
   document.getElementById('energy-val').textContent = energy.toFixed(3);
+  document.getElementById('variation-val').textContent = variation.toFixed(2);
   document.getElementById('count-val').textContent = analyzeCount;
-
-  // フィードバックボタンを表示
   document.getElementById('feedback').style.display = 'block';
   document.getElementById('choices').style.display = 'none';
 
@@ -332,7 +346,7 @@ function updateDisplay(pitch, energy, result) {
   const history = document.getElementById('history');
   const item = document.createElement('div');
   item.className = 'history-item';
-  item.textContent = now + ' ' + result.emotion + ' → ' + result.message;
+  item.textContent = now + ' ' + e.icon + result.emotion + ' ' + e.message;
   history.appendChild(item);
   history.scrollTop = history.scrollHeight;
 }
@@ -345,20 +359,7 @@ function stopRecording() {
   document.getElementById('stopBtn').style.display = 'none';
 }
 
-// 起動時に学習状況を表示
 updateLearningDisplay();
 </script>
 </body>
 </html>
-```
-
-**⑤「Commit changes」で保存**
-
----
-
-### これで何が変わる？
-
-解析結果が出るたびに👇が表示されます
-```
-この結果は正しいですか？
-[正しい ✅]  [違う ❌]
